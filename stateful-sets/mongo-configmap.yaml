@@ -1,0 +1,8 @@
+# the config map for mongodb stateful set deployment
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-config
+data:
+  PORT: "27017"
