@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: non-parallel-job
+spec:
+  template:
+      metadata:
+        name: helloworld-pod
+      spec:
+        containers:
+          - name: busybox
+            image: busybox
+            command: ["sh","-c","echo Hello World from non parallel job && sleep 15"]
+        restartPolicy: OnFailure
+  completions: 4
+      
