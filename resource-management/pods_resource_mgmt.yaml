@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-demo
+  labels:
+    name: resource-demo
+  namespace: resource-management
+spec:
+  containers:
+  - name: nginx-demo
+    image: nginx
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "2"
+      requests:
+        memory: "64Mi"
+        cpu: "1"
+    resizePolicy:
+      - resourceName: cpu
+        restartPolicy: NotRequired
+      - resourceName: memory
+        restartPolicy: RestartContainer
+    ports:
+      - containerPort: 80
+
+# kubectl patch pod resource-demo -p '{"spec":{"containers":[{"name":"nginx-demo", "resources":{"requests":{"cpu":"800m"}, "limits":{"cpu":"800m"}}}]}}' -n resource-management --type=strategic
