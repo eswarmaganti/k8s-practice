@@ -2,7 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment
+  labels:
+    tier: frontend
 spec:
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
   replicas: 3
   selector:
     matchLabels:
@@ -17,10 +22,8 @@ spec:
           image: nginx
           ports:
             - containerPort: 80
-          resources:
-            limits:
-              cpu: "1"
-              memory: 50Mi
+          
+          # liveness probe to check the health of nginx container
           livenessProbe:
             httpGet:
               path: /

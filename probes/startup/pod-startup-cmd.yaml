@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: startup-probe
+spec:
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-pod
+  template:
+    metadata:
+      labels:
+        app: nginx-pod
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          command: ["sh", "-c"]
+          args: ['mkdir -p /tmp/SP/data; echo {\"data\": \"hello world\" } >> /tmp/SP/data/input.json; sleep 120; rm /tmp/SP/data/input.json']
+          startupProbe:
+            exec:
+              command:
+                - cat 
+                - /tmp/SP/data/input.json
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          livenessProbe:
+            exec:
+              command:
+                - cat 
+                - /tmp/SP/data/input.json
+            periodSeconds: 60
