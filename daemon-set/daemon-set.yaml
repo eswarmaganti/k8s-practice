@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-elasticsearch
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+spec:
+
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+
+  updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+    spec:
+      # these toleratios are to have the daemonset runnable on controlplane nodes
+      # remove them if your control plane nodes should not run pods
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+          
+      containers:
+        - name: fluentd-elasticsearch
+          image: fluentd:latest
+          resources:
+            limits:
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      # it may be desirable to set a high priority class to the Daemon POd to ensure that it preempts running pods
+      # priorityClassName: important
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+
