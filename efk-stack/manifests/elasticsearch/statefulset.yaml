@@ -6,7 +6,7 @@ metadata:
   name: es-cluster
   namespace: kube-logging
 spec:
-  replicas: 3
+  replicas: 1
   serviceName: elasticsearch
   selector:
     matchLabels:
@@ -51,9 +51,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: discovery.seed_hosts
-              value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster2.elasticsearch"
+              value: "es-cluster-0.elasticsearch"
             - name: Cluster.initial_master_nodes
-              value: "es-cluster-0,es-cluster-1,es-cluster-2"
+              value: "es-cluster-0"
             - name: ES_JAVA_OPTS
               value: "-Xms512m -Xmx512m"
       
