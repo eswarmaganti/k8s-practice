@@ -16,7 +16,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      partition: 3
+      partition: 1
 
   # defining the statefulset template
   template:
@@ -52,7 +52,7 @@ spec:
                   fieldPath: metadata.name
             - name: discovery.seed_hosts
               value: "es-cluster-0.elasticsearch"
-            - name: Cluster.initial_master_nodes
+            - name: cluster.initial_master_nodes
               value: "es-cluster-0"
             - name: ES_JAVA_OPTS
               value: "-Xms512m -Xmx512m"

@@ -34,23 +34,7 @@ EFK Components gets deployed as folows
     ### ElasticSearch Headless Service
     - The service manifest for ElasticSearch StatefulSet will be as below.
     
-        ```
-        apiVersion: v1
-        kind: Service
-        metadata:
-        name: elasticsearch
-        labels:
-            app: elasticsearch
-        spec:
-        selector:
-            app: elasticsearch
-        clusterIP: None
-        ports:
-            - port: 9200
-            name: rest
-            - port: 9300
-            name: inter-node
-        ```
+        ![alt elasticsearch service](images/elasticsearch-service.png)
 
     - Create the Headless service for ElasticSearch using the below command
     
@@ -75,94 +59,7 @@ EFK Components gets deployed as folows
     - A Kubernetes StatefulSet allows you to assign a stable identity to Pods and grant them stable, persistent storage.
     - ElasticSearch requires stable storage to persist data across Pod rescheduling and restarts.
         
-        ```
-        # Deploying elasticsearch as StatefulSet
-        ---
-        apiVersion: apps/v1
-        kind: StatefulSet
-        metadata:
-        name: elasticsearch-cluster
-        spec:
-        replicas: 3
-        serviceName: elasticsearch
-        selector:
-            matchLables:
-            app: elasticsearch
-        strategy:
-            rollingUpdate:
-            maxUnavailable: 1
-        template:
-            metadata:
-            labels:
-                app: elasticsearch
-            spec:
-            containers:
-                # Main ElasticSearch Container definition
-                - name: elasticsearch
-                image: docker.elastic.co/elasticsearch/elasticsearch:7.5.0
-                resources:
-                    limits:
-                    cpu: 1000m
-                    requests:
-                    cpu: 100m
-                ports:
-                    - name: rest
-                    containerPort: 9200
-                    protocol: TCP
-                    - name: inter-node
-                    containerPort: 9300
-                    protocol: TCP
-                volumeMounts:
-                    - name: data
-                    mountPath: /usr/share/elasticsearch/data
-                env:
-                    - name: cluster.name
-                    value: k8s-logs
-                    - name: node.name
-                    valueFrom:
-                        fieldRef:
-                        fieldPath: metadata.name
-                    - name: discovery.seed_hosts
-                    value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster2.elasticsearch"
-                    - name: Cluster.initial_master_nodes
-                    value: "es-cluster-0,es-cluster-1,es-cluster-2"
-                    - name: ES_JAVA_OPTS
-                    value: "-Xms512m -Xmx512m"
-            
-            # init containers to fix permission issues
-            initContainers:
-                - name: fix-permissions
-                image: busybox
-                command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
-                securityContext:
-                    privileged: true
-                volumeMounts:
-                    - name: data
-                    mountPath: /usr/share/elasticsearch/data
-                - name: increase-vm-max-map
-                image: busybox
-                command: ["systemctl","-w","vm.max_map_count=262144"]
-                securityContext:
-                    privileged: true
-                - name: increase-fd-ulimit
-                image: busybox
-                command: ["sh", "-c", "ulimit -n 65536"]
-                securityContext:
-                    privileged: true
-
-            # defining the volume claim template for the elasticsearch container to store logs
-            volumeClaimTemplates:
-                - metadata:
-                    name: data
-                    lables:
-                    app: elasticsearch
-                spec:
-                    accessModes: ["ReadWriteOnce"]
-                    resources:
-                    requests:
-                        storage: 3Gi
-
-        ```
+        ![alt elasticsearch statefulset](images/elasticsearch-statefulset.png)
     - To create the statefulset we can use the below command
         ```
         $ kubectl apply -f elasticsearch/statefulset.yaml
@@ -187,3 +84,76 @@ EFK Components gets deployed as folows
     - Next, we define the StatefulSet `VolumeClaimTemplates`. Kubernetes will use this to create PersistentVolumes for the Pods. In the block above, we name it `data`. We gave it the same `app: elasticsearch` label as our StatefulSet.
     - we then specify its access mode as `ReadWriteOnce`, which means that it can only be mounted as read-write by a single node.
     - Finally we specify that we'd like each PeristentVilume to be 3GiB size. You should adjust this value depending on your production needs.
+  
+## Creating Kibana Deployment and Service
+- To Launch Kibana on Kubernetes, we'll create a Service called `kibana`, and a Deployment consisting of one Pod replica. You can scale the number of replicas based on production needs, and optionally specify a `LoadBalencer` type for the Service to load balence the requests across the Deployment Pods.
+  
+  ### Kibana Service
+  - We can create the Kibana Service using the below configuration
+      ![alt kibana service](images/kibana-service.png)
+  - To create the kibana Deployment, we can use the below configuration
+    ![alt kibana deployment](images/kibana-deployment.png)
+  - In the above spec we have defined a Service called `kibana` in the `kube-logging` namespace, and give it the `app: kibana` label
+  - We have specified that it should be accessible on port `5601` and use the `app: kibana` label to seect the Service's target Pods.
+  - In the `Deployment` spec, we have define a Deployment called `kibana` and specified one Pod replica.
+  - we use the `docker.elasticsearch.co/kibana/kibana:7.2.0` image.
+  - We specify that we'd like at the very least 01.vCPU guranteed to the Pod, bursting up to a limit of 1 vCPU. 
+  - We use the `ELASTICSEARCH_URL` environment variable to set the endpoint and port for the Elasticsearch cluster. Using kubernetes DNS, this endpoint corresponds to its Service name `elasticsearch`. 
+  - We can rollout the creation of kibana Service and Deployment using the below commands
+    ```
+    $ kubectl apply -f kibana/service.yaml
+
+    $ kubectl apply -f kibana/deployment.yaml
+    ```
+  - To check the rollout status of kibana deployment, we can use the below command
+    ```
+    $ kubectl rollout status deployment/kibana -n kube-logging
+
+    ```
+  - To view the running pods in our kubernetes cluster we can run the below command
+    ```
+    $ kubectl get pods -n kube-logging
+    ```
+  - To access the kibana service in our local machine, we can forward the localport to kibana service port using the below command  
+  
+    ```
+    $ kubectl port-forward <kibana-pod-name> 5601:5601 -n kube-logging
+
+    ```
+  - Now we can access the kibana dashboard in our local browser using the url endpoint `http://localhost:5601`
+
+## Creating the Fluentd DaemonSet
+- Here, we will setup Fluentd as a DaemonSet, which is kubernetes workload type that runs a copy f given Pod on each Node in kubernetes cluster. Using this DaemonSet controller we'll rollout a fluentd logging agent Pod on every node in our cluster.
+- In Kubernetes, containerized applications that llog to `stdout` and `stderr` have their log streams captured and redirected to JSON files on the nodes. The Fluentd Pod will tail these log files, filter log events, transform the log data, and ship it off to the ElasticSearch logging backend.
+- In addition to container logs, the Fluentd agent will tail Kubernetes system component logs like kubelet, kube-proxy, and Doker logs.
+  ### Fluentd ServiceAccount
+  - Here, we create a ServiceAccount called `fluentd` that the Fluentd Pods will use to access the Kubernetes API. We will create it in the `kube-logging` namespace and once again give it the label `app: fluentd`.
+    
+    ![alt fluentd service account](images/fluentd-service-account.png)
+  ### Fluentd ClusterRole
+  - Here we define a ClusterRole called `fluentd` to which we grant the get, list, and watch permissions on the `pods` and `namespaces` objects.
+  - ClusterRoles allow you to grant access to cluster-scoped kubernetes resources like Nodes.
+    
+    ![alt fluentd cluster role](images/fluentd-cluster-role.png)
+
+  ### Fluentd ClusterRoleBinding
+  - Here, we define a `ClusterRoleBinding` called `fluentd` which binds the fluentd ClusterRole to the fluentd ServiceAccount. This grants the `fluentd` ServiceAccount the permissions listed in the `fluentd` ClusterRole.
+    
+    ![alt fluentd cluster role binding](images/fluentd-cluster-role-binding.png)
+
+  ### Fluentd DaemonSet
+  - Here, we define a DaemonSet called `fluentd` in the `kube-logging` namespace and give it the `app: fluentd` label.
+  - We match the `app: fluentd` label defined in `.metadata.labels` and then assign the DaemonSet the `fluentd` ServiceAccount. We also select the `app: fluentd` as the Pods managed by this DaemonSet.
+  - Next, we define a `NoSchedule` toleration to match the equivalent taint on Kubernetes master nodes. This will ensure that the DaemonSet also get rolled out to the Kubernetes masters.
+  - If you dont want to run a Fluentd Pod on your master nodes, remove this toleration.
+  - Next, we begin defining the Pod container, which we call `fluentd`
+  - Next, we configure Fluentd using some environment variables
+    - `FLUENT_ELASTICSEARCH_HOST`: We set this to the ElasticSearch headless Service address defined earlier: `elasticsearch.kube-logging.svc.cluster.local`. This will resolve to a list of IP addresses for the 3 ElasticSearch Pods.
+    - `FLUENTD_ELASTICSEARCH_PORT`: We set this to the ElasticSearch port we configured earlier, `9200`.
+    - `FLUENTD_ELASTICSEARCH_SCHEME`: We set this to `http`.
+    - `FLUENTD_SYSTEMD_CONF`: We set this to disable to suppress output related to `systemd` not being set up in the container.
+    - Here, we specify 512MiB memory limit on thr FluentD Pod, and gurantee it 0.1 vCPU and 200MiB of memory. 
+    - Next, we mount the `/var/log` and `/var/lib/docker/containers` host paths into container using volume mounts. These volumes are defined at the end of the block under `volumes`
+    - The final parameter we define in the block is `terminationGracePeriodSeconds`, which gives Fluentd 30 seconds to shutdown gracefully upon receiving a `SIGTERM` signal. After 30 seconds, the containers are sent a `SIGKILL` signal.
+    
+        ![alt fluentd daemonset](images/fluentd-daemonset.png)
