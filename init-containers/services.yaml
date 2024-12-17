@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mydb
+spec:
+  selector:
+    app: db
+  type: ClusterIP
+  ports:
+    - targetPort: 80
+      port: 80
+      name: dbport
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myservice
+spec:
+  selector:
+    app: service
+  type: ClusterIP
+  ports:
+    - targetPort: 80
+      port: 80
+      name: service-port
