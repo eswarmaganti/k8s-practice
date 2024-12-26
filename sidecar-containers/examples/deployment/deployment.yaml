@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidecar-demo
+  labels:
+    app: sidecar
+spec:
+  selector:
+    matchLabels:
+      app: sidecar
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: sidecar
+    spec:
+      containers:
+        - name: app-container
+          image: busybox
+          command: ["sh","-c","while true; do echo $(date) Writing the logs >> /var/log/app.log; sleep 1; done "]
+          volumeMounts:
+            - mountPath: /var/log
+              name: varlog
+      initContainers:
+        - name: sidecar
+          image: busybox
+          command: ["sh","-c", "tail -F /var/log/app.log"]
+          restartPolicy: Always
+          volumeMounts:
+            - mountPath: /var/log
+              name: varlog
+      volumes:
+        - name: varlog
+          emptyDir: {}
