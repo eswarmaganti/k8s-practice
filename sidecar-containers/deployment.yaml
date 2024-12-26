@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidecar-deployment
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidecar
+  template:
+    metadata:
+      labels:
+        app: sidecar
+    spec:
+      containers:
+        # busybox main container which generates the logs
+        - name: busybox
+          image: busybox
+          command: ["sh", "-c"]
+          args: ['i=0; while true;do echo "$i :- `date` " >> /var/log/1.log; echo "$i :- `date` " >> /var/log/2.log; i=$((i+1)); sleep 5; done ']
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+        
+        # fluentd sidecar container to pull the logs and write to s3 bucket
+        - name: fluentd
+          image: lrakai/fluentd-s3:latest
+          env:
+            - name:  FLUENTD_ARGS
+              value: -c /fluentd/etc/fluent.conf
+          # volume mounts for fluentd sidecar container
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: config-volume
+              mountPath: /fluentd/etc
+
+      # defining the container volumes
+      volumes:
+        - name: varlog
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: fluentd-config

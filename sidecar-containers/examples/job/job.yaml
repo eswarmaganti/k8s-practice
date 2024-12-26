@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sidecar-job-demo
+  labels:
+    app: sidecar
+spec:
+  template:
+    spec:
+      containers:
+        - name: job
+          image: busybox
+          command: ["sh", "-c", "echo $(date) Job is running successfully, logging the status >> /var/log/job-status.log"]
+          volumeMounts:
+            - mountPath: /var/log
+              name: varlog
+      initContainers:
+        - name: sidecar
+          image: busybox
+          command: ["sh","-c","tail -F /var/log/job-status.log"]
+          restartPolicy: Always
+          volumeMounts:
+            - mountPath: /var/log
+              name: varlog
+      restartPolicy: Never
+      volumes:
+        - name: varlog
+          emptyDir: {}

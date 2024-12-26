@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+data:
+  fluent.conf: |
+    # First log file source (tailing a file at /var/log/1.log)
+    <source>
+      @type tail
+      format none
+      path /var/log/1.log
+      pos_file /var/log/1.log.pos
+      tag count.format1
+    </source>
+
+    # Second log file source
+    <source>
+      @type tail
+      format none
+      path /var/log/2.log
+      pos_file /var/log/2.log.pos
+      tag count.format2
+    </source>
+
+    # S3 output configuration store (store files every 5 minute in s3 buckets logs folder)
+    <match **>
+      @type s3
+
+      aws_key_id <AWS KEY>
+      aws_sec_key <AWS SECRET KEY>
+      s3_bucket eswarmaganti-test-bucket
+      s3_region us-east-1
+      path logs/
+      buffer_path /var/log
+      store_as text
+      time_slice_format %Y%m%d%H%M
+      time_slice_wait 1m
+
+      <instance_profile_credentials>
+      </instance_profile_credentials>
+    </match>
