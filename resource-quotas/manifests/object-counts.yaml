@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resource-quota-count-objects
+  namespace: myspace
+spec:
+  hard:
+    pods: "10"
+    count/deployments.apps: "2"
+    configmaps: "10"
+    secrets: "10"
+    services: "5"
+    services.loadbalancers: "2"
+    replicationcontrollers: "2"
