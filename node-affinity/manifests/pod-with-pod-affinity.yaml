@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-pod-affinity
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports:
+        - containerPort: 80
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: topology.kubernetes.io/zone
+          labelSelector:
+            matchExpressions:
+              - key: security
+                operator: In
+                values:
+                  - S1
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            topologyKey: topology.kubernetes.io/zone
+            labelSelector:
+              matchExpressions:
+                - key: security
+                  operator: In
+                  values:
+                    - S2
+          weight: 100
